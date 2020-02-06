@@ -1,60 +1,88 @@
 #!/usr/bin/env python3
+#
+# Manage light through MQTT
+#
+# Author: Arnaud Morin <arnaud.morin@gmail.com>
+# License: Apache 2
 
 import paho.mqtt.client as mqtt
 import json
+import logging
 
-# The callback for when the client receives a CONNACK response from the server.
-def on_connect(client, userdata, flags, rc):
-    print("Connected with result code "+str(rc))
 
-    # Subscribing in on_connect() means that if we lose the connection and
-    # reconnect then subscriptions will be renewed.
-    #client.subscribe("+/+/+")
-    client.subscribe("tele/bridge/RESULT")
+class LumiereMqttClient(object):
+    def __init__(self):
+        # Init the logger
+        self.logger = logging.getLogger()
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.debug('Starting logger')
 
-# The callback for when a PUBLISH message is received from the server.
-def on_message(client, userdata, msg):
-    #print(msg.topic+" "+str(msg.payload))
-    try:
-        if msg.topic == 'tele/bridge/RESULT':
-            message = json.loads(msg.payload)
+        # Init the MQTT client
+        self.client = mqtt.Client()
+        self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
+        self.client.username_pw_set('tasmota', 'tasmota')    # Yes, this is the password
+        self.logger.debug('Connecting to Mosquitto')
+        self.client.connect("127.0.0.1", 1883, 60)
 
-            # Alex allumer
-            if message['RfReceived']['Data'] == 'B8E488':
-                print('Alex allumer')
-                client.publish('cmnd/lumiere/POWER', 'ON')
+    def on_connect(self, client, userdata, flags, rc):
+        '''
+        The callback for when the client receives a CONNACK response from the server.
+        '''
+        self.logger.debug('Connected to Mosquitto')
 
-            # Alex eteindre
-            elif message['RfReceived']['Data'] == 'B8E484':
-                print('Alex eteindre')
-                client.publish('cmnd/lumiere/POWER', 'OFF')
+        # Subscribing in on_connect() means that if we lose the connection and
+        # reconnect then subscriptions will be renewed.
+        # client.subscribe("+/+/+")
+        self.logger.debug('Subscribing to RESULT')
+        client.subscribe("tele/bridge/RESULT")
 
-            # Arnaud allumer
-            elif message['RfReceived']['Data'] == 'D8A0A8':
-                print('Arnaud allumer')
-                client.publish('cmnd/lumiere/POWER', 'ON')
+    def on_message(self, client, userdata, msg):
+        '''
+        The callback for when a PUBLISH message is received from the server.
+        '''
+        try:
+            if msg.topic == 'tele/bridge/RESULT':
+                message = json.loads(msg.payload)
 
-            # Alex eteindre
-            elif message['RfReceived']['Data'] == 'D8A0A4':
-                print('Arnaud eteindre')
-                client.publish('cmnd/lumiere/POWER', 'OFF')
+                if message['RfReceived']['Data'] == 'B8E488':
+                    self.logger.info('Received B8E488 --> Alex ON')
+                    client.publish('cmnd/lumiere/POWER', 'ON')
 
-            # Nouveau code
-            elif message['RfReceived']['Data']:
-                print('Nouveau code: {}'.format(message['RfReceived']['Data']))
+                elif message['RfReceived']['Data'] == 'B8E484':
+                    self.logger.info('Received B8E484 --> Alex OFF')
+                    client.publish('cmnd/lumiere/POWER', 'OFF')
 
-    except Exception as e:
-        print('Error occurend {}'.format(e))
+                elif message['RfReceived']['Data'] == 'D8A0A8':
+                    self.logger.info('Received D8A0A8 --> Arnaud ON')
+                    client.publish('cmnd/lumiere/POWER', 'ON')
 
-client = mqtt.Client()
-client.on_connect = on_connect
-client.on_message = on_message
+                elif message['RfReceived']['Data'] == 'D8A0A4':
+                    self.logger.info('Received D8A0A4 --> Arnaud OFF')
+                    client.publish('cmnd/lumiere/POWER', 'OFF')
 
-client.username_pw_set('tasmota', 'tasmota')
-client.connect("127.0.0.1", 1883, 60)
+                # Unknow code
+                elif message['RfReceived']['Data']:
+                    self.logger.info('Received {}'.format(message['RfReceived']['Data']))
 
-# Blocking call that processes network traffic, dispatches callbacks and
-# handles reconnecting.
-# Other loop*() functions are available that give a threaded interface and a
-# manual interface.
-client.loop_forever()
+        except Exception as e:
+            self.logger.error('Error occured: {}'.format(e))
+
+    def serve(self):
+        '''
+        Blocking call that processes network traffic, dispatches callbacks and
+        handles reconnecting.
+        Other loop*() functions are available that give a threaded interface and a
+        manual interface.
+        '''
+        self.logger.info('Starting to serve')
+        self.client.loop_forever()
+
+
+if __name__ == '__main__':
+    lumiere = LumiereMqttClient()
+    lumiere.serve()
