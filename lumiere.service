@@ -1,12 +1,10 @@
 [Unit]
 Description=Lumiere
-After=syslog.target network.target
+#After=syslog.target network.target
 
 [Service]
-User=arnaud
-Group=arnaud
-ExecStart=/opt/lumiere/start.py
+ExecStart=/home/arnaud/dev/github/lumiere/start.py
 Restart=always
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
