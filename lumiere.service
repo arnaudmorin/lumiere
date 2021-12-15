@@ -4,6 +4,7 @@ Description=Lumiere
 
 [Service]
 ExecStart=/home/arnaud/dev/github/lumiere/start.py
+SyslogIdentifier=lumiere
 Restart=always
 
 [Install]

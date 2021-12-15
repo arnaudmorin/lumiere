@@ -13,7 +13,7 @@ import logging
 class LumiereMqttClient(object):
     def __init__(self):
         # Init the logger
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger('lumiere')
         handler = logging.StreamHandler()
         formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
         handler.setFormatter(formatter)
